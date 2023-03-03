@@ -1,0 +1,47 @@
+//
+// Copyright (C) 2021 The Android-x86 Open Source Project
+// Copyright (C) 2023 KonstaKANG
+//
+// Licensed under the GNU Lesser General Public License Version 2.1.
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.gnu.org/licenses/lgpl.html
+//
+
+cc_library_shared {
+    name: "libasound",
+    vendor: true,
+
+    cflags: [
+        "-DPIC",
+        "-Wno-absolute-value",
+        "-Wno-address-of-packed-member",
+        "-Wno-missing-braces",
+        "-Wno-missing-field-initializers",
+        "-Wno-pointer-arith",
+        "-Wno-sign-compare",
+        "-Wno-unused-function",
+        "-Wno-unused-const-variable",
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+        "-finline-limit=300",
+        "-finline-functions",
+        "-fno-inline-functions-called-once",
+    ],
+
+    srcs: ["src/**/*.c"],
+    exclude_srcs: [
+        "src/alisp/alisp_snd.c",
+        "src/compat/hsearch_r.c",
+        "src/control/control_shm.c",
+        "src/pcm/pcm_d*.c",
+        "src/pcm/pcm_ladspa.c",
+        "src/pcm/pcm_shm.c",
+        "src/pcm/scopes/level.c",
+    ],
+
+    local_include_dirs: ["include"],
+    export_include_dirs: ["android"],
+    shared_libs: ["libdl"],
+}
