@@ -393,6 +393,8 @@ typedef long snd_pcm_sframes_t;
 #define SND_PCM_NONBLOCK		0x00000001
 /** Async notification (flag for open mode) \hideinitializer */
 #define SND_PCM_ASYNC			0x00000002
+/** Return EINTR instead blocking (wait operation) */
+#define SND_PCM_EINTR			0x00000080
 /** In an abort state (internal, not allowed for open) */
 #define SND_PCM_ABORT			0x00008000
 /** Disable automatic (but not forced!) rate resamplinig */
@@ -497,6 +499,13 @@ typedef union _snd_pcm_sync_id {
 	/** 32-bit ID */
 	unsigned int id32[4];
 } snd_pcm_sync_id_t;
+
+/** Infinite wait for snd_pcm_wait() */
+#define SND_PCM_WAIT_INFINITE		(-1)
+/** Wait for next i/o in snd_pcm_wait() */
+#define SND_PCM_WAIT_IO			(-10001)
+/** Wait for drain in snd_pcm_wait() */
+#define SND_PCM_WAIT_DRAIN		(-10002)
 
 /** #SND_PCM_TYPE_METER scope handle */
 typedef struct _snd_pcm_scope snd_pcm_scope_t;
@@ -722,6 +731,7 @@ int snd_pcm_hw_params_is_half_duplex(const snd_pcm_hw_params_t *params);
 int snd_pcm_hw_params_is_joint_duplex(const snd_pcm_hw_params_t *params);
 int snd_pcm_hw_params_can_sync_start(const snd_pcm_hw_params_t *params);
 int snd_pcm_hw_params_can_disable_period_wakeup(const snd_pcm_hw_params_t *params);
+int snd_pcm_hw_params_is_perfect_drain(const snd_pcm_hw_params_t *params);
 int snd_pcm_hw_params_supports_audio_wallclock_ts(const snd_pcm_hw_params_t *params); /* deprecated, use audio_ts_type */
 int snd_pcm_hw_params_supports_audio_ts_type(const snd_pcm_hw_params_t *params, int type);
 int snd_pcm_hw_params_get_rate_numden(const snd_pcm_hw_params_t *params,
@@ -821,6 +831,8 @@ int snd_pcm_hw_params_set_export_buffer(snd_pcm_t *pcm, snd_pcm_hw_params_t *par
 int snd_pcm_hw_params_get_export_buffer(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int *val);
 int snd_pcm_hw_params_set_period_wakeup(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int val);
 int snd_pcm_hw_params_get_period_wakeup(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int *val);
+int snd_pcm_hw_params_set_drain_silence(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int val);
+int snd_pcm_hw_params_get_drain_silence(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int *val);
 
 int snd_pcm_hw_params_get_period_time(const snd_pcm_hw_params_t *params, unsigned int *val, int *dir);
 int snd_pcm_hw_params_get_period_time_min(const snd_pcm_hw_params_t *params, unsigned int *val, int *dir);

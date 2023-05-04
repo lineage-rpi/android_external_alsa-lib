@@ -1705,7 +1705,7 @@ int snd_pcm_link(snd_pcm_t *pcm1, snd_pcm_t *pcm2)
 	assert(pcm1);
 	assert(pcm2);
 	if (pcm1->fast_ops->link)
-		err = pcm1->fast_ops->link(pcm1, pcm2);
+		err = pcm1->fast_ops->link(pcm1->fast_op_arg, pcm2);
 	else
 		err = -ENOSYS;
 	return err;
@@ -1722,7 +1722,7 @@ int snd_pcm_unlink(snd_pcm_t *pcm)
 
 	assert(pcm);
 	if (pcm->fast_ops->unlink)
-		err = pcm->fast_ops->unlink(pcm);
+		err = pcm->fast_ops->unlink(pcm->fast_op_arg);
 	else
 		err = -ENOSYS;
 	return err;
@@ -2834,7 +2834,8 @@ int snd_pcm_open_named_slave(snd_pcm_t **pcmp, const char *name,
  * \brief Wait for a PCM to become ready
  * \param pcm PCM handle
  * \param timeout maximum time in milliseconds to wait,
- *        a negative value means infinity
+ *        a -1 value means infinity (SND_PCM_WAIT_INFINITE),
+ *	       see also SND_PCM_WAIT_IO and SND_PCM_WAIT_DRAIN
  * \return a positive value on success otherwise a negative error code
  *         (-EPIPE for the xrun and -ESTRPIPE for the suspended status,
  *          others for general errors) 
@@ -2869,6 +2870,37 @@ int __snd_pcm_wait_in_lock(snd_pcm_t *pcm, int timeout)
 	return snd_pcm_wait_nocheck(pcm, timeout);
 }
 
+static int __snd_pcm_wait_io_timeout(snd_pcm_t *pcm)
+{
+	int timeout;
+
+	/* period size is the time boundary */
+	timeout = (pcm->period_size * 1000ULL) / pcm->rate;
+	/* should not happen */
+	if (timeout < 0)
+		timeout = 0;
+	/* add extra time of 200 milliseconds */
+	timeout += 200;
+	return timeout;
+}
+
+static int __snd_pcm_wait_drain_timeout(snd_pcm_t *pcm)
+{
+	int timeout;
+
+	/* for capture, there's no reason to wait, just one iteration */
+	if (snd_pcm_stream(pcm) == SND_PCM_STREAM_CAPTURE)
+		return 0;
+	/* result is in milliseconds */
+	timeout = (snd_pcm_mmap_playback_delay(pcm) * 1000LL) / pcm->rate;
+	/* should not happen */
+	if (timeout < 0)
+		timeout = 0;
+	/* add extra time of 200 milliseconds */
+	timeout += 200;
+	return timeout;
+}
+
 /* 
  * like snd_pcm_wait() but doesn't check mmap_avail before calling poll()
  *
@@ -2895,12 +2927,18 @@ int snd_pcm_wait_nocheck(snd_pcm_t *pcm, int timeout)
 		SNDMSG("invalid poll descriptors %d\n", err);
 		return -EIO;
 	}
+	if (timeout == SND_PCM_WAIT_IO)
+		timeout = __snd_pcm_wait_io_timeout(pcm);
+	else if (timeout == SND_PCM_WAIT_DRAIN)
+		timeout = __snd_pcm_wait_drain_timeout(pcm);
+	else if (timeout < -1)
+		SNDMSG("invalid snd_pcm_wait timeout argument %d\n", timeout);
 	do {
 		__snd_pcm_unlock(pcm->fast_op_arg);
 		err_poll = poll(pfd, npfds, timeout);
 		__snd_pcm_lock(pcm->fast_op_arg);
 		if (err_poll < 0) {
-		        if (errno == EINTR && !PCMINABORT(pcm))
+			if (errno == EINTR && !PCMINABORT(pcm) && !(pcm->mode & SND_PCM_EINTR))
 		                continue;
 			return -errno;
                 }
@@ -3705,6 +3743,29 @@ int snd_pcm_hw_params_can_disable_period_wakeup(const snd_pcm_hw_params_t *param
 		return 0; /* FIXME: should be a negative error? */
 	}
 	return !!(params->info & SNDRV_PCM_INFO_NO_PERIOD_WAKEUP);
+}
+
+/**
+ * \brief Check if hardware is capable of perfect drain
+ * \param params Configuration space
+ * \retval 0 Hardware doesn't do perfect drain
+ * \retval 1 Hardware does perfect drain
+ *
+ * This function should only be called when the configuration space
+ * contains a single configuration. Call #snd_pcm_hw_params to choose
+ * a single configuration from the configuration space.
+ *
+ * Perfect drain means that the hardware does not use samples
+ * beyond the stream application pointer.
+ */
+int snd_pcm_hw_params_is_perfect_drain(const snd_pcm_hw_params_t *params)
+{
+	assert(params);
+	if (CHECK_SANITY(params->info == ~0U)) {
+		SNDMSG("invalid PCM info field");
+		return 0; /* FIXME: should be a negative error? */
+	}
+	return !!(params->info & SNDRV_PCM_INFO_PERFECT_DRAIN);
 }
 
 /**
@@ -4932,6 +4993,43 @@ int snd_pcm_hw_params_get_period_wakeup(snd_pcm_t *pcm, snd_pcm_hw_params_t *par
 {
 	assert(pcm && params && val);
 	*val = params->flags & SND_PCM_HW_PARAMS_NO_PERIOD_WAKEUP ? 0 : 1;
+	return 0;
+}
+
+/**
+ * \brief Restrict a configuration space to fill the end of playback stream with silence when drain() is invoked
+ * \param pcm PCM handle
+ * \param params Configuration space
+ * \param val 0 = disabled, 1 = enabled (default) fill the end of the playback stream with silence when drain() is invoked
+ * \return Zero on success, otherwise a negative error code.
+ *
+ * When disabled, the application should handle the end of stream gracefully
+ * (fill the silent samples to align to the period size plus some extra
+ * samples for hardware / driver without perfect drain). Note that the rewind
+ * may be used for this purpose or the sw_params silencing mechanism.
+ */
+int snd_pcm_hw_params_set_drain_silence(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int val)
+{
+	assert(pcm && params);
+	if (val)
+		params->flags &= ~SND_PCM_HW_PARAMS_NO_DRAIN_SILENCE;
+	else
+		params->flags |= SND_PCM_HW_PARAMS_NO_DRAIN_SILENCE;
+	params->rmask = ~0;
+	return snd_pcm_hw_refine(pcm, params);
+}
+
+/**
+ * \brief Extract drain with the filling of silence samples from a configuration space
+ * \param pcm PCM handle
+ * \param params Configuration space
+ * \param val 0 = disabled, 1 = enabled
+ * \return 0 otherwise a negative error code
+ */
+int snd_pcm_hw_params_get_drain_silence(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int *val)
+{
+	assert(pcm && params && val);
+	*val = params->flags & SND_PCM_HW_PARAMS_NO_DRAIN_SILENCE ? 0 : 1;
 	return 0;
 }
 
@@ -6167,6 +6265,25 @@ int snd_pcm_hw_params_get_min_align(const snd_pcm_hw_params_t *params, snd_pcm_u
 	return 0;
 }
 
+#ifndef DOXYGEN
+void snd_pcm_sw_params_current_no_lock(snd_pcm_t *pcm, snd_pcm_sw_params_t *params)
+{
+	params->proto = SNDRV_PCM_VERSION;
+	params->tstamp_mode = pcm->tstamp_mode;
+	params->tstamp_type = pcm->tstamp_type;
+	params->period_step = pcm->period_step;
+	params->sleep_min = 0;
+	params->avail_min = pcm->avail_min;
+	sw_set_period_event(params, pcm->period_event);
+	params->xfer_align = 1;
+	params->start_threshold = pcm->start_threshold;
+	params->stop_threshold = pcm->stop_threshold;
+	params->silence_threshold = pcm->silence_threshold;
+	params->silence_size = pcm->silence_size;
+	params->boundary = pcm->boundary;
+}
+#endif
+
 /**
  * \brief Return current software configuration for a PCM
  * \param pcm PCM handle
@@ -6183,19 +6300,7 @@ int snd_pcm_sw_params_current(snd_pcm_t *pcm, snd_pcm_sw_params_t *params)
 		return -EIO;
 	}
 	__snd_pcm_lock(pcm); /* forced lock due to pcm field changes */
-	params->proto = SNDRV_PCM_VERSION;
-	params->tstamp_mode = pcm->tstamp_mode;
-	params->tstamp_type = pcm->tstamp_type;
-	params->period_step = pcm->period_step;
-	params->sleep_min = 0;
-	params->avail_min = pcm->avail_min;
-	sw_set_period_event(params, pcm->period_event);
-	params->xfer_align = 1;
-	params->start_threshold = pcm->start_threshold;
-	params->stop_threshold = pcm->stop_threshold;
-	params->silence_threshold = pcm->silence_threshold;
-	params->silence_size = pcm->silence_size;
-	params->boundary = pcm->boundary;
+	snd_pcm_sw_params_current_no_lock(pcm, params);
 	__snd_pcm_unlock(pcm);
 	return 0;
 }
@@ -7458,7 +7563,7 @@ snd_pcm_sframes_t snd_pcm_read_areas(snd_pcm_t *pcm, const snd_pcm_channel_area_
 				goto _end;
 			}
 
-			err = __snd_pcm_wait_in_lock(pcm, -1);
+			err = __snd_pcm_wait_in_lock(pcm, SND_PCM_WAIT_IO);
 			if (err < 0)
 				break;
 			goto _again;
@@ -7527,7 +7632,7 @@ snd_pcm_sframes_t snd_pcm_write_areas(snd_pcm_t *pcm, const snd_pcm_channel_area
 					goto _end;
 				}
 
-				err = snd_pcm_wait_nocheck(pcm, -1);
+				err = snd_pcm_wait_nocheck(pcm, SND_PCM_WAIT_IO);
 				if (err < 0)
 					break;
 				goto _again;

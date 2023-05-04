@@ -572,16 +572,18 @@ static int execute_sysw(const char *sysw)
 	wlen = write(fd, value, len);
 	myerrno = errno;
 	close(fd);
-	free(s);
 
 	if (ignore_error)
-		return 0;
+		goto __end;
 
 	if (wlen != (ssize_t)len) {
 		uc_error("unable to write '%s' to '%s': %s", value, path, strerror(myerrno));
+		free(s);
 		return -EINVAL;
 	}
 
+__end:
+	free(s);
 	return 0;
 }
 
@@ -998,13 +1000,14 @@ static int add_auto_values(snd_use_case_mgr_t *uc_mgr)
 /**
  * \brief execute default commands
  * \param uc_mgr Use case manager
+ * \param force Force run
  * \return zero on success, otherwise a negative error code
  */
-static int set_defaults(snd_use_case_mgr_t *uc_mgr)
+static int set_defaults(snd_use_case_mgr_t *uc_mgr, bool force)
 {
 	int err;
 
-	if (uc_mgr->default_list_executed)
+	if (!force && uc_mgr->default_list_executed)
 		return 0;
 	err = execute_sequence(uc_mgr, NULL, &uc_mgr->default_list,
 			       &uc_mgr->value_list, NULL, NULL);
@@ -1351,7 +1354,7 @@ static int set_verb(snd_use_case_mgr_t *uc_mgr,
 	int err;
 
 	if (enable) {
-		err = set_defaults(uc_mgr);
+		err = set_defaults(uc_mgr, false);
 		if (err < 0)
 			return err;
 		seq = &verb->enable_list;
@@ -1432,6 +1435,22 @@ static int set_device(snd_use_case_mgr_t *uc_mgr,
 	} else if (!enable) {
 		list_del(&device->active_list);
 	}
+	return err;
+}
+
+/**
+ * \brief Do the full reset
+ * \param uc_mgr Use case manager
+ * \return zero on success, otherwise a negative error code
+ */
+static int do_reset(snd_use_case_mgr_t *uc_mgr)
+{
+	int err;
+
+	err = set_defaults(uc_mgr, true);
+	INIT_LIST_HEAD(&uc_mgr->active_modifiers);
+	INIT_LIST_HEAD(&uc_mgr->active_devices);
+	uc_mgr->active_verb = NULL;
 	return err;
 }
 
@@ -1569,6 +1588,8 @@ int snd_use_case_mgr_reload(snd_use_case_mgr_t *uc_mgr)
 
 	pthread_mutex_lock(&uc_mgr->mutex);
 
+	do_reset(uc_mgr);
+
 	uc_mgr_free_verb(uc_mgr);
 
 	uc_mgr->default_list_executed = 0;
@@ -1633,8 +1654,7 @@ static int dismantle_use_case(snd_use_case_mgr_t *uc_mgr)
 	}
 	uc_mgr->active_verb = NULL;
 
-	err = execute_sequence(uc_mgr, NULL, &uc_mgr->default_list,
-			       &uc_mgr->value_list, NULL, NULL);
+	err = set_defaults(uc_mgr, true);
 	
 	return err;
 }
@@ -1649,11 +1669,7 @@ int snd_use_case_mgr_reset(snd_use_case_mgr_t *uc_mgr)
 	int err;
 
 	pthread_mutex_lock(&uc_mgr->mutex);
-	err = execute_sequence(uc_mgr, NULL, &uc_mgr->default_list,
-			       &uc_mgr->value_list, NULL, NULL);
-	INIT_LIST_HEAD(&uc_mgr->active_modifiers);
-	INIT_LIST_HEAD(&uc_mgr->active_devices);
-	uc_mgr->active_verb = NULL;
+	err = do_reset(uc_mgr);
 	pthread_mutex_unlock(&uc_mgr->mutex);
 	return err;
 }
@@ -2399,19 +2415,37 @@ int snd_use_case_get(snd_use_case_mgr_t *uc_mgr,
 	return err;
 }
 
+/*
+ * a helper macro to obtain status and existence
+ */
+#define geti(uc_mgr, status, ifind, str, value) ({ \
+	long val = -EINVAL; \
+	if (str) { \
+		val = (status)((uc_mgr), (str)); \
+		if (val >= 0) { \
+			if ((ifind)((uc_mgr), (uc_mgr)->active_verb, (str), 0)) { \
+				*(value) = val; \
+				val = 0; \
+			} else { \
+				val = -ENOENT; \
+			} \
+		} \
+	} \
+	; val; /* return value */ \
+})
 
 /**
  * \brief Get current - integer
  * \param uc_mgr Use case manager
- * \param identifier 
- * \return Value if success, otherwise a negative error code 
+ * \param identifier
+ * \return Value if success, otherwise a negative error code
  */
 int snd_use_case_geti(snd_use_case_mgr_t *uc_mgr,
 		      const char *identifier,
 		      long *value)
 {
 	char *str, *str1;
-	long err;
+	int err;
 
 	pthread_mutex_lock(&uc_mgr->mutex);
 	if (0) {
@@ -2428,31 +2462,15 @@ int snd_use_case_geti(snd_use_case_mgr_t *uc_mgr,
 			str = NULL;
 		}
 		if (check_identifier(identifier, "_devstatus")) {
-			if (!str) {
-				err = -EINVAL;
-				goto __end;
-			}
-			err = device_status(uc_mgr, str);
-			if (err >= 0) {
-				*value = err;
-				err = 0;
-			}
+			err = geti(uc_mgr, device_status, find_device, str, value);
 		} else if (check_identifier(identifier, "_modstatus")) {
-			if (!str) {
-				err = -EINVAL;
-				goto __end;
-			}
-			err = modifier_status(uc_mgr, str);
-			if (err >= 0) {
-				*value = err;
-				err = 0;
-			}
+			err = geti(uc_mgr, modifier_status, find_modifier, str, value);
 #if 0
 		/*
 		 * enable this block if the else clause below is expanded to query
 		 * user-supplied values
 		 */
-		} else if (identifier[0] == '_')
+		} else if (identifier[0] == '_') {
 			err = -ENOENT;
 #endif
 		} else
@@ -2512,7 +2530,7 @@ static int set_defaults_user(snd_use_case_mgr_t *uc_mgr,
 		uc_error("error: wrong value for _defaults (%s)", value);
 		return -EINVAL;
 	}
-	return set_defaults(uc_mgr);
+	return set_defaults(uc_mgr, false);
 }
 
 static int handle_transition_verb(snd_use_case_mgr_t *uc_mgr,
@@ -2793,7 +2811,7 @@ int snd_use_case_parse_ctl_elem_id(snd_ctl_elem_id_t *dst,
 	    strcmp(ucm_id, "CaptureSwitch"))
 		return -EINVAL;
 	snd_ctl_elem_id_clear(dst);
-	if (strcasestr(ucm_id, "name="))
+	if (strcasestr(value, "name="))
 		return __snd_ctl_ascii_elem_id_parse(dst, value, NULL);
 	iface = SND_CTL_ELEM_IFACE_MIXER;
 	if (jack_control)

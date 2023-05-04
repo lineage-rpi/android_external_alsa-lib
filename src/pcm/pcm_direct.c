@@ -44,7 +44,7 @@
  *
  */
  
-#if !defined(__OpenBSD__) && !defined(__DragonFly__)
+#if !defined(__OpenBSD__) && !defined(__DragonFly__) && !defined(__ANDROID__)
 union semun {
 	int              val;    /* Value for SETVAL */
 	struct semid_ds *buf;    /* Buffer for IPC_STAT, IPC_SET */
@@ -688,7 +688,7 @@ int snd_pcm_direct_check_xrun(snd_pcm_direct_t *direct, snd_pcm_t *pcm)
 		 * so don't increment but just update to actual counter
 		 */
 		direct->recoveries = direct->shmptr->s.recoveries;
-		pcm->fast_ops->drop(pcm);
+		pcm->fast_ops->drop(pcm->fast_op_arg);
 		/* trigger_tstamp update is missing in drop callbacks */
 		gettimestamp(&direct->trigger_tstamp, pcm->tstamp_type);
 		/* no timer clear:

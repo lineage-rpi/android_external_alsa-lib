@@ -1018,7 +1018,7 @@ static int snd_pcm_rate_sync_playback_area(snd_pcm_t *pcm, snd_pcm_uframes_t app
 		slave_size -= rate->gen.slave->period_size;
 		rate->last_commit_ptr += pcm->period_size;
 		if (rate->last_commit_ptr >= pcm->boundary)
-			rate->last_commit_ptr = 0;
+			rate->last_commit_ptr -= pcm->boundary;
 	}
 	return 0;
 }
@@ -1146,7 +1146,7 @@ static int snd_pcm_rate_drain(snd_pcm_t *pcm)
 			snd_pcm_uframes_t psize, spsize;
 			int err;
 
-			err = __snd_pcm_wait_in_lock(rate->gen.slave, -1);
+			err = __snd_pcm_wait_in_lock(rate->gen.slave, SND_PCM_WAIT_DRAIN);
 			if (err < 0)
 				break;
 			if (size > pcm->period_size) {
@@ -1163,7 +1163,7 @@ static int snd_pcm_rate_drain(snd_pcm_t *pcm)
 			if (commit_err == 1) {
 				rate->last_commit_ptr += psize;
 				if (rate->last_commit_ptr >= pcm->boundary)
-					rate->last_commit_ptr = 0;
+					rate->last_commit_ptr -= pcm->boundary;
 			} else if (commit_err == 0) {
 				if (pcm->mode & SND_PCM_NONBLOCK) {
 					commit_err = -EAGAIN;

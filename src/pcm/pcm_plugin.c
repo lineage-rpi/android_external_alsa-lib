@@ -597,8 +597,12 @@ int snd_pcm_plugin_may_wait_for_avail_min_conv(
 		 * a) the slave can provide contineous hw_ptr between periods
 		 * b) avail_min does not match one slave_period
 		 */
-		snd_pcm_plugin_t *plugin = pcm->private_data;
-		snd_pcm_t *slave = plugin->gen.slave;
+		snd_pcm_generic_t *generic = pcm->private_data;
+		/*
+		 * do not use snd_pcm_plugin_t pointer here
+		 * this code is used from the generic plugins, too
+		 */
+		snd_pcm_t *slave = generic->slave;
 		snd_pcm_uframes_t needed_slave_avail_min;
 		snd_pcm_sframes_t available;
 

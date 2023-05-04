@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-lib, 1.2.8)
+AC_INIT(alsa-lib, 1.2.9)
 
 AC_CONFIG_SRCDIR([src/control/control.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -255,9 +255,8 @@ AC_ARG_WITH(libdl,
   [ have_libdl="$withval" ], [ have_libdl="yes" ])
 HAVE_LIBDL=
 if test "$have_libdl" = "yes"; then
-  AC_CHECK_LIB([dl], [dlsym], [HAVE_LIBDL="yes"])
+  AC_SEARCH_LIBS([dlsym], [dl], [HAVE_LIBDL="yes"])
   if test "$HAVE_LIBDL" = "yes" ; then
-    ALSA_DEPLIBS="$ALSA_DEPLIBS -ldl"
     AC_DEFINE([HAVE_LIBDL], 1, [Have libdl])
   fi
 else
