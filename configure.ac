@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(alsa-lib, 1.2.9)
+AC_INIT(alsa-lib, 1.2.10)
 
 AC_CONFIG_SRCDIR([src/control/control.c])
 AC_CONFIG_MACRO_DIR([m4])
@@ -46,11 +46,15 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_C_INLINE
 AC_HEADER_TIME
+AC_CHECK_ATTRIBUTE_SYMVER
 
 dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS([uselocale])
 AC_CHECK_FUNCS([eaccess])
+
+dnl Enable largefile support
+AC_SYS_LARGEFILE
 
 SAVE_LIBRARY_VERSION
 AC_SUBST(LIBTOOL_VERSION_INFO)
@@ -781,9 +785,11 @@ EOF
 fi
 cat >> include/asoundlib.h <<EOF
 
+#ifndef DOC_HIDDEN
 #ifndef __GNUC__
 #define __inline__ inline
 #endif
+#endif /* DOC_HIDDEN */
 
 #include <alsa/asoundef.h>
 #include <alsa/version.h>
@@ -795,6 +801,7 @@ cat >> include/asoundlib.h <<EOF
 EOF
 test "$build_pcm" = "yes" && echo "#include <alsa/pcm.h>" >> include/asoundlib.h
 test "$build_rawmidi" = "yes" && echo "#include <alsa/rawmidi.h>" >> include/asoundlib.h
+test "$build_rawmidi" = "yes" && echo "#include <alsa/ump.h>" >> include/asoundlib.h
 test "$build_pcm" = "yes" && echo "#include <alsa/timer.h>" >> include/asoundlib.h
 test "$build_hwdep" = "yes" && echo "#include <alsa/hwdep.h>" >> include/asoundlib.h
 echo "#include <alsa/control.h>" >> include/asoundlib.h

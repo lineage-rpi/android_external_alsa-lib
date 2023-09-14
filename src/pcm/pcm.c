@@ -223,7 +223,7 @@ There are two methods to transfer samples in application. The first method
 is the standard read / write one. The second method, uses the direct audio
 buffer to communicate with the device while ALSA library manages this space
 itself. You can find examples of all communication schemes for playback
-in \ref example_test_pcm "Sine-wave generator example". To complete the
+in \link example_test_pcm Sine-wave generator example \endlink. To complete the
 list, we should note that #snd_pcm_wait() function contains
 embedded poll waiting implementation.
 
@@ -632,32 +632,42 @@ The null device is null plugin. This device has not any arguments.
 The full featured examples with cross-links can be found in Examples section
 (see top of page):
 
-\anchor example_test_pcm
 \par Sine-wave generator
 \par
-alsa-lib/test/pcm.c example shows various transfer methods for the playback direction.
+\link example_test_pcm alsa-lib/test/pcm.c \endlink
+example shows various transfer methods for the playback direction.
 
 \par Minimalistic PCM playback code
 \par
-alsa-lib/test/pcm_min.c example shows the minimal code to produce a sound.
+\link example_test_minimal alsa-lib/test/pcm_min.c \endlink
+example shows the minimal code to produce a sound.
 
 \par Latency measuring tool
 \par
-alsa-lib/test/latency.c example shows the measuring of minimal latency between capture and
+\link example_test_latency alsa-lib/test/latency.c \endlink
+example shows the measuring of minimal latency between capture and
 playback devices.
 
 */
 
 /**
 \example ../../test/pcm.c
+\anchor example_test_pcm
+Shows various transfer methods for the playback direction.
 */
 /**
 \example ../../test/pcm_min.c
+\anchor example_test_minimal
+Shows the minimal code to produce a sound.
 */
 /**
 \example ../../test/latency.c
+\anchor example_test_latency
+Shows the measuring of minimal latency between capture and
+playback devices.
 */
 
+#include "pcm_local.h"
 #include <stdio.h>
 #include <string.h>
 #if HAVE_MALLOC_H
@@ -669,7 +679,6 @@ playback devices.
 #include <poll.h>
 #include <sys/mman.h>
 #include <limits.h>
-#include "pcm_local.h"
 
 #ifndef DOC_HIDDEN
 /* return specific error codes for known bad PCM states */
@@ -2234,7 +2243,7 @@ const char *snd_pcm_tstamp_mode_name(const snd_pcm_tstamp_t mode)
 
 /**
  * \brief get name of PCM tstamp type setting
- * \param mode PCM tstamp type
+ * \param type PCM tstamp type
  * \return ascii name of PCM tstamp type setting
  */
 const char *snd_pcm_tstamp_type_name(snd_pcm_tstamp_type_t type)
@@ -2916,7 +2925,7 @@ int snd_pcm_wait_nocheck(snd_pcm_t *pcm, int timeout)
 	
 	npfds = __snd_pcm_poll_descriptors_count(pcm);
 	if (npfds <= 0 || npfds >= 16) {
-		SNDERR("Invalid poll_fds %d\n", npfds);
+		SNDERR("Invalid poll_fds %d", npfds);
 		return -EIO;
 	}
 	pfd = alloca(sizeof(*pfd) * npfds);
@@ -2924,7 +2933,7 @@ int snd_pcm_wait_nocheck(snd_pcm_t *pcm, int timeout)
 	if (err < 0)
 		return err;
 	if (err != npfds) {
-		SNDMSG("invalid poll descriptors %d\n", err);
+		SNDMSG("invalid poll descriptors %d", err);
 		return -EIO;
 	}
 	if (timeout == SND_PCM_WAIT_IO)
@@ -2932,7 +2941,7 @@ int snd_pcm_wait_nocheck(snd_pcm_t *pcm, int timeout)
 	else if (timeout == SND_PCM_WAIT_DRAIN)
 		timeout = __snd_pcm_wait_drain_timeout(pcm);
 	else if (timeout < -1)
-		SNDMSG("invalid snd_pcm_wait timeout argument %d\n", timeout);
+		SNDMSG("invalid snd_pcm_wait timeout argument %d", timeout);
 	do {
 		__snd_pcm_unlock(pcm->fast_op_arg);
 		err_poll = poll(pfd, npfds, timeout);
@@ -3439,12 +3448,12 @@ int snd_pcm_areas_copy(const snd_pcm_channel_area_t *dst_areas, snd_pcm_uframes_
 
 /**
  * \brief Copy one or more areas
- * \param dst_areas destination areas specification (one for each channel)
+ * \param dst_channels destination areas specification (one for each channel)
  * \param dst_offset offset in frames inside destination area
  * \param dst_size size in frames of the destination buffer
- * \param src_areas source areas specification (one for each channel)
+ * \param src_channels source areas specification (one for each channel)
  * \param src_offset offset in frames inside source area
- * \param dst_size size in frames of the source buffer
+ * \param src_size size in frames of the source buffer
  * \param channels channels count
  * \param frames frames to copy
  * \param format PCM sample format
@@ -6399,7 +6408,7 @@ int snd_pcm_sw_params_set_start_mode(snd_pcm_t *pcm, snd_pcm_sw_params_t *params
 		params->start_threshold = pcm->boundary;
 		break;
 	default:
-		SNDMSG("invalid start mode value %d\n", val);
+		SNDMSG("invalid start mode value %d", val);
 		return -EINVAL;
 	}
 	return 0;
@@ -6447,7 +6456,7 @@ int snd_pcm_sw_params_set_xrun_mode(snd_pcm_t *pcm, snd_pcm_sw_params_t *params,
 		params->stop_threshold = pcm->boundary;
 		break;
 	default:
-		SNDMSG("invalid xrun mode value %d\n", val);
+		SNDMSG("invalid xrun mode value %d", val);
 		return -EINVAL;
 	}
 	return 0;
@@ -7022,7 +7031,7 @@ void snd_pcm_status_get_driver_htstamp(const snd_pcm_status_t *obj, snd_htimesta
 /**
  * \brief Get audio_tstamp_report from a PCM status container
  * \param obj pointer to #snd_pcm_status_t
- * \param ptr Pointer to returned report (valid fields are accuracy and type)
+ * \param audio_tstamp_report Pointer to returned report
  */
 void snd_pcm_status_get_audio_htstamp_report(const snd_pcm_status_t *obj,
 					     snd_pcm_audio_tstamp_report_t *audio_tstamp_report)
@@ -7036,7 +7045,7 @@ void snd_pcm_status_get_audio_htstamp_report(const snd_pcm_status_t *obj,
 /**
  * \brief set audio_tstamp_config from a PCM status container
  * \param obj pointer to #snd_pcm_status_t
- * \param ptr Pointer to config (valid fields are type and report_analog_delay)
+ * \param audio_tstamp_config Pointer to config (valid fields are type_requested and report_delay)
  */
 void snd_pcm_status_set_audio_htstamp_config(snd_pcm_status_t *obj,
 					     snd_pcm_audio_tstamp_config_t *audio_tstamp_config)
@@ -7431,7 +7440,7 @@ int __snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas,
  _skip:
 \endcode
  *
- * Look to the \ref example_test_pcm "Sine-wave generator" example
+ * Look to the \link example_test_pcm Sine-wave generator \endlink example
  * for more details about the generate_sine function.
  *
  * The function is thread-safe when built with the proper option.

@@ -48,6 +48,7 @@
 #include <alsa/conf.h>
 #include <alsa/pcm.h>
 #include <alsa/rawmidi.h>
+#include <alsa/ump.h>
 #include <alsa/timer.h>
 #include <alsa/hwdep.h>
 #include <alsa/control.h>

@@ -374,10 +374,6 @@ int snd_card_get_index(const char *name);
 int snd_card_get_name(int card, char **name);
 int snd_card_get_longname(int card, char **name);
 
-int snd_device_name_hint(int card, const char *iface, void ***hints);
-int snd_device_name_free_hint(void **hints);
-char *snd_device_name_get_hint(const void *hint, const char *id);
-
 int snd_ctl_open(snd_ctl_t **ctl, const char *name, int mode);
 int snd_ctl_open_lconf(snd_ctl_t **ctl, const char *name, int mode, snd_config_t *lconf);
 int snd_ctl_open_fallback(snd_ctl_t **ctl, snd_config_t *root, const char *name, const char *orig_name, int mode);
@@ -417,6 +413,9 @@ int snd_ctl_pcm_prefer_subdevice(snd_ctl_t *ctl, int subdev);
 int snd_ctl_rawmidi_next_device(snd_ctl_t *ctl, int * device);
 int snd_ctl_rawmidi_info(snd_ctl_t *ctl, snd_rawmidi_info_t * info);
 int snd_ctl_rawmidi_prefer_subdevice(snd_ctl_t *ctl, int subdev);
+int snd_ctl_ump_next_device(snd_ctl_t *ctl, int *device);
+int snd_ctl_ump_endpoint_info(snd_ctl_t *ctl, snd_ump_endpoint_info_t *info);
+int snd_ctl_ump_block_info(snd_ctl_t *ctl, snd_ump_block_info_t *info);
 #endif
 int snd_ctl_set_power_state(snd_ctl_t *ctl, unsigned int state);
 int snd_ctl_get_power_state(snd_ctl_t *ctl, unsigned int *state);
@@ -791,6 +790,20 @@ int snd_sctl_build(snd_sctl_t **ctl, snd_ctl_t *handle, snd_config_t *config,
 int snd_sctl_free(snd_sctl_t *handle);
 int snd_sctl_install(snd_sctl_t *handle);
 int snd_sctl_remove(snd_sctl_t *handle);
+
+/** \} */
+
+/**
+ *  \defgroup Hint Name Hint Interface
+ *  \ingroup Configuration
+ *  The name hint interface - get descriptive information about a device
+ *  (name, description, input/output).
+ *  \{
+ */
+
+int snd_device_name_hint(int card, const char *iface, void ***hints);
+int snd_device_name_free_hint(void **hints);
+char *snd_device_name_get_hint(const void *hint, const char *id);
 
 /** \} */
 

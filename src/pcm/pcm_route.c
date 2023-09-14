@@ -26,12 +26,11 @@
  *
  */
   
-#include "bswap.h"
-#include <math.h>
 #include "pcm_local.h"
 #include "pcm_plugin.h"
-
 #include "plugin_ops.h"
+#include "bswap.h"
+#include <math.h>
 
 #ifndef PIC
 /* entry for static linking */
@@ -766,7 +765,9 @@ static int strtochannel(const char *id, snd_pcm_chmap_t *chmap,
 	}
 }
 
+#ifndef DOC_HIDDEN
 #define MAX_CHMAP_CHANNELS 256
+#endif
 
 static int determine_chmap(snd_config_t *tt, snd_pcm_chmap_t **tt_chmap)
 {

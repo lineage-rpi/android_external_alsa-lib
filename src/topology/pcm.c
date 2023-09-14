@@ -17,7 +17,6 @@
            Liam Girdwood <liam.r.girdwood@linux.intel.com>
 */
 
-#include "list.h"
 #include "tplg_local.h"
 
 #define RATE(v) [SND_PCM_RATE_##v] = #v
@@ -1365,10 +1364,12 @@ int tplg_save_cc(snd_tplg_t *tplg ATTRIBUTE_UNUSED,
 	return err;
 }
 
+#ifndef DOC_HIDDEN
 struct audio_hw_format {
 	unsigned int type;
 	const char *name;
 };
+#endif /* DOC_HIDDEN */
 
 static struct audio_hw_format audio_hw_formats[] = {
 	{
@@ -1479,7 +1480,7 @@ int tplg_parse_hw_config(snd_tplg_t *tplg, snd_config_t *cfg,
 
 		provider_legacy = false;
 		if (strcmp(id, "bclk_master") == 0) {
-			SNDERR("deprecated option %s, please use 'bclk'\n", id);
+			SNDERR("deprecated option %s, please use 'bclk'", id);
 			provider_legacy = true;
 		}
 
@@ -1531,7 +1532,7 @@ int tplg_parse_hw_config(snd_tplg_t *tplg, snd_config_t *cfg,
 
 		provider_legacy = false;
 		if (strcmp(id, "fsync_master") == 0) {
-			SNDERR("deprecated option %s, please use 'fsync'\n", id);
+			SNDERR("deprecated option %s, please use 'fsync'", id);
 			provider_legacy = true;
 		}
 
